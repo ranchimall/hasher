@@ -39,6 +39,10 @@ app.use(
     })
 );
 
+app.get('/', (req, res) => {
+    res.send('Hello There!');
+})
+
 // hashContent function to hash the content of a file
 async function hashContent(content) {
     const hash = createHash('sha256');
