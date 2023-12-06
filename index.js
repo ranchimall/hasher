@@ -1,7 +1,5 @@
 require('dotenv').config();
 const express = require('express');
-const https = require('https');
-const fs = require('fs');
 const axios = require('axios');
 const { createHash } = require('crypto');
 const archiver = require('archiver');
@@ -75,6 +73,7 @@ app.post('/hash', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
+
 // Function to download a GitHub repo as a zip file
 async function downloadGitHubRepo(owner, repo) {
     if (!owner || !repo) {
@@ -127,18 +126,11 @@ app.post('/download-repos', async (req, res) => {
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
-// HTTPS options (provide the paths to your SSL/TLS certificate and private key)
-const httpsOptions = {
-    key: fs.readFileSync('server-key.pem'),
-    cert: fs.readFileSync('server-cert.pem'),
-};
-
-// Create HTTPS server
-const server = https.createServer(httpsOptions, app);
 
 // Start the server
-server.listen(port, () => {
-    console.log(`Server is running at https://localhost:${port}`);
+app.listen(port, () => {
+    console.log(`Server is running at http://localhost:${port}`);
 });
+
 // Export the Express API
-module.exports = app
+module.exports = app;
