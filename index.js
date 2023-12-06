@@ -15,22 +15,22 @@ app.use(express.json());
 const allowedDomains = process.env.ALLOWED_DOMAINS.split(',');
 
 // Middleware to allow requests only from specified domains
-app.use((req, res, next) => {
-    const { origin } = req.headers;
+// app.use((req, res, next) => {
+//     const { origin } = req.headers;
 
-    // Check if the requesting origin is in the allowedDomains array
-    if (allowedDomains.includes(origin)) {
-        res.setHeader('Access-Control-Allow-Origin', origin);
-    }
+//     // Check if the requesting origin is in the allowedDomains array
+//     if (allowedDomains.includes(origin)) {
+//         res.setHeader('Access-Control-Allow-Origin', origin);
+//     }
 
-    // Other headers for handling preflight requests and allowing credentials if needed
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+//     // Other headers for handling preflight requests and allowing credentials if needed
+//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+//     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+//     res.setHeader('Access-Control-Allow-Credentials', 'true');
 
-    // Continue to the next middleware or route handler
-    next();
-});
+//     // Continue to the next middleware or route handler
+//     next();
+// });
 
 app.use(
     rateLimit({
