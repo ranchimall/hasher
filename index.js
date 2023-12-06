@@ -129,8 +129,8 @@ app.post('/download-repos', async (req, res) => {
 });
 // HTTPS options (provide the paths to your SSL/TLS certificate and private key)
 const httpsOptions = {
-    key: fs.readFileSync('./server-key.pem'),
-    cert: fs.readFileSync('./server-cert.pem'),
+    key: fs.readFileSync('server-key.pem'),
+    cert: fs.readFileSync('server-cert.pem'),
 };
 
 // Create HTTPS server
