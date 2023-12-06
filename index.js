@@ -140,3 +140,5 @@ const server = https.createServer(httpsOptions, app);
 server.listen(port, () => {
     console.log(`Server is running at https://localhost:${port}`);
 });
+// Export the Express API
+module.exports = app
