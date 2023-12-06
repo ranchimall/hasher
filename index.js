@@ -4,6 +4,8 @@ const axios = require('axios');
 const { createHash } = require('crypto');
 const archiver = require('archiver');
 const rateLimit = require('express-rate-limit');
+const { parse: parseUrl } = require('url');
+const { parse: parseHtml } = require('node-html-parser');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -42,13 +44,44 @@ app.use(
 app.get('/', (req, res) => {
     res.send('Hello There!');
 })
-
 // hashContent function to hash the content of a file
 async function hashContent(content) {
     const hash = createHash('sha256');
     hash.update(content);
     return hash.digest('hex');
 }
+
+// Recursive function to fetch and hash content, including linked resources
+async function fetchAndHashContent(url, visitedUrls = new Set()) {
+    if (visitedUrls.has(url)) {
+        return '';  // Avoid fetching the same URL multiple times to prevent infinite loops
+    }
+
+    visitedUrls.add(url);
+
+    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    const content = response.data.toString('utf-8');
+
+    // Parse HTML content to identify linked resources
+    const root = parseHtml(content);
+    const linkedResources = root.querySelectorAll('link[rel="stylesheet"], script[src]');
+    // Fetch and hash linked resources
+    const linkedResourceHashes = await Promise.all(linkedResources.map(async (resource) => {
+        const resourceUrl = parseUrl(resource.getAttribute('href') || resource.getAttribute('src'), true);
+        let absoluteResourceUrl = resourceUrl.href;
+        if (!resourceUrl.hostname) {
+            if (!resourceUrl.path.startsWith('/') && !url.endsWith('/'))
+                url += '/';
+            absoluteResourceUrl = `${url}${resourceUrl.path}`;
+        }
+        const resourceContent = await fetchAndHashContent(absoluteResourceUrl, visitedUrls);
+        return `${resourceUrl.path}_${resourceContent}`;
+    }));
+
+    // Combine the content and hashes of linked resources
+    return `${content}_${linkedResourceHashes.join('_')}`;
+}
+
 
 // API endpoint to start the recursive download and hashing
 app.post('/hash', async (req, res) => {
@@ -62,15 +95,17 @@ app.post('/hash', async (req, res) => {
             url = [url];
 
         const promises = url.map(async (url) => {
-            const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
-            const fileHash = await hashContent(response.data);
+            const hashedContent = await fetchAndHashContent(url);
+            const fileHash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
             return { url, fileHash };
-        })
+        });
+
         let results = await Promise.all(promises);
         results = results.reduce((acc, { url, fileHash }) => {
             acc[url] = fileHash;
             return acc;
         }, {});
+
         res.json(results);
     } catch (error) {
         console.error('Error:', error.message);
