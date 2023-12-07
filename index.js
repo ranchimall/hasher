@@ -8,40 +8,28 @@ const rateLimit = require('express-rate-limit');
 const { parse: parseUrl } = require('url');
 const { parse: parseHtml } = require('node-html-parser');
 
+// Set up the allowed domains (replace with your specific domains)
+const allowedDomains = process.env.ALLOWED_DOMAINS.split(',');
 const app = express();
+
+// pass the cors options to the cors middleware to enable CORS for the allowed domains
+// const corsOptions = {
+//     origin: allowedDomains,
+//     optionsSuccessStatus: 200, // Some legacy browsers (IE11, various SmartTVs) choke on 204
+// }
+app.use(cors());
 const port = process.env.PORT || 3000;
-const host = process.env.HOST || 'localhost';
+const host = process.env.HOST || '0.0.0.0';
 
 // Middleware to parse JSON requests
 app.use(express.json());
 // Middleware to enable CORS
-app.use(cors());
 
-// Set up the allowed domains (replace with your specific domains)
-const allowedDomains = process.env.ALLOWED_DOMAINS.split(',');
-
-// Middleware to allow requests only from specified domains
-// app.use((req, res, next) => {
-//     const { origin } = req.headers;
-
-//     // Check if the requesting origin is in the allowedDomains array
-//     if (allowedDomains.includes(origin)) {
-//         res.setHeader('Access-Control-Allow-Origin', origin);
-//     }
-
-//     // Other headers for handling preflight requests and allowing credentials if needed
-//     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-//     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-//     res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-//     // Continue to the next middleware or route handler
-//     next();
-// });
 
 app.use(
     rateLimit({
         windowMs: 1 * 60 * 1000, // 1 minute
-        max: 10, // limit each IP request
+        max: 10, // limit each IP request per windowMs
     })
 );
 
@@ -90,23 +78,22 @@ async function fetchAndHashContent(url, visitedUrls = new Set()) {
 // API endpoint to start the recursive download and hashing
 app.post('/hash', async (req, res) => {
     try {
-        console.log('Request:', req.body);
-        let { url } = req.body;
-        if (!url) {
+        let { urls } = req.body;
+        if (!urls) {
             return res.status(400).json({ error: 'Missing URL in the request parameters' });
         }
-        if (!Array.isArray(url))
-            url = [url];
+        if (!Array.isArray(urls))
+            urls = [urls];
 
-        const promises = url.map(async (url) => {
-            const hashedContent = await fetchAndHashContent(url);
+        const promises = urls.map(async (urls) => {
+            const hashedContent = await fetchAndHashContent(urls);
             const fileHash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
-            return { url, fileHash };
+            return { urls, fileHash };
         });
 
         let results = await Promise.all(promises);
-        results = results.reduce((acc, { url, fileHash }) => {
-            acc[url] = fileHash;
+        results = results.reduce((acc, { urls, fileHash }) => {
+            acc[urls] = fileHash;
             return acc;
         }, {});
 
