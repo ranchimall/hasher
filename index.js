@@ -38,7 +38,7 @@ const allowedDomains = process.env.ALLOWED_DOMAINS.split(',');
 app.use(
     rateLimit({
         windowMs: 1 * 60 * 1000, // 1 minute
-        max: 1, // limit each IP to 1 request per windowMs
+        max: 10, // limit each IP request
     })
 );
 
@@ -169,7 +169,7 @@ app.post('/download-repos', async (req, res) => {
 
 // Start the server
 app.listen(port, host, () => {
-    console.log(`Server is running at http://localhost:${port}`);
+    console.log(`Server is running at http://${host}:${port}`);
 });
 
 // Export the Express API
