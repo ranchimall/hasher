@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const axios = require('axios');
 const { createHash } = require('crypto');
 const archiver = require('archiver');
@@ -13,6 +14,8 @@ const host = process.env.HOST || 'localhost';
 
 // Middleware to parse JSON requests
 app.use(express.json());
+// Middleware to enable CORS
+app.use(cors());
 
 // Set up the allowed domains (replace with your specific domains)
 const allowedDomains = process.env.ALLOWED_DOMAINS.split(',');
