@@ -9,6 +9,7 @@ const { parse: parseHtml } = require('node-html-parser');
 
 const app = express();
 const port = process.env.PORT || 3000;
+const host = process.env.HOST || 'localhost';
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -167,7 +168,7 @@ app.post('/download-repos', async (req, res) => {
 });
 
 // Start the server
-app.listen(port, () => {
+app.listen(port, host, () => {
     console.log(`Server is running at http://localhost:${port}`);
 });
 
