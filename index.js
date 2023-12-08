@@ -5,7 +5,7 @@ const axios = require('axios');
 const { createHash } = require('crypto');
 const archiver = require('archiver');
 const rateLimit = require('express-rate-limit');
-const { parse: parseUrl } = require('url');
+const { parse: parseUrl, URL } = require('url');
 const { parse: parseHtml } = require('node-html-parser');
 
 // Set up the allowed domains (replace with your specific domains)
@@ -36,6 +36,19 @@ app.use(
 app.get('/', (req, res) => {
     res.send('Hello There!');
 })
+
+function parseUrlWithoutHashAndQuery(fullUrl) {
+    const parsedUrl = new URL(fullUrl);
+
+    // Set the hash and search/query to empty strings
+    parsedUrl.hash = '';
+    parsedUrl.search = '';
+
+    // Reconstruct the URL without hash and query
+    const urlWithoutHashAndQuery = parsedUrl.toString();
+
+    return urlWithoutHashAndQuery;
+}
 // hashContent function to hash the content of a file
 async function hashContent(content) {
     const hash = createHash('sha256');
@@ -85,8 +98,10 @@ app.post('/hash', async (req, res) => {
         if (!Array.isArray(urls))
             urls = [urls];
 
-        const promises = urls.map(async (urls) => {
-            const hashedContent = await fetchAndHashContent(urls);
+        const promises = urls.map(async (url) => {
+            const urlWithoutHashAndQuery = parseUrlWithoutHashAndQuery(url);
+            console.log(url, `Fetching and hashing ${urlWithoutHashAndQuery}`);
+            const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
             const fileHash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
             return { urls, fileHash };
         });
