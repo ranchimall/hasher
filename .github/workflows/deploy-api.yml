@@ -3,7 +3,7 @@ on: [push]
 jobs:
   build:
     name: Pull changes and deploy API
-    runs-on: self-hosted
+    runs-on: [ramanujam]
     steps:
     - name: multiple command
       uses: appleboy/ssh-action@v1.0.0
