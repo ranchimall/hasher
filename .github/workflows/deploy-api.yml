@@ -5,11 +5,13 @@ jobs:
     name: Pull changes and deploy API
     runs-on: self-hosted
     steps:
-    - name: executing remote ssh commands using password
+    - name: multiple command
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.HOST }}
         username: ${{ secrets.USERNAME }}
-        password: ${{ secrets.PASSWORD }}
+        key: ${{ secrets.KEY }}
         port: ${{ secrets.PORT }}
-        script: whoami
+        script: |
+          whoami
+          ls -al
