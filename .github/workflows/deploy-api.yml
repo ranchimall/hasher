@@ -1,5 +1,6 @@
 name: Pull changes and deploy API
 on: [push]
+
 jobs:
   build:
     name: Pull changes and deploy API
