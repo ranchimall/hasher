@@ -36,8 +36,15 @@ app.use(
 app.get('/', (req, res) => {
     res.send('Hello There!');
 })
+function addProtocolToUrl(url) {
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+    }
+    return url;
+}
 
 function parseUrlWithoutHashAndQuery(fullUrl) {
+    fullUrl = addProtocolToUrl(fullUrl);
     const parsedUrl = new URL(fullUrl);
 
     // Set the hash and search/query to empty strings
@@ -93,29 +100,27 @@ app.post('/hash', async (req, res) => {
     try {
         let { urls } = req.body;
         if (!urls) {
-            return res.status(400).json({ error: 'Missing URL in the request parameters' });
+            return res.status(400).json({ error: 'Missing <urls> in the request parameters' });
         }
         if (!Array.isArray(urls))
             urls = [urls];
 
         const promises = urls.map(async (url) => {
             const urlWithoutHashAndQuery = parseUrlWithoutHashAndQuery(url);
-            console.log(url, `Fetching and hashing ${urlWithoutHashAndQuery}`);
             const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
             const fileHash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
-            return { urls, fileHash };
+            return { url, fileHash };
         });
 
         let results = await Promise.all(promises);
-        results = results.reduce((acc, { urls, fileHash }) => {
-            acc[urls] = fileHash;
+        results = results.reduce((acc, { url, fileHash }) => {
+            acc[url] = fileHash;
             return acc;
         }, {});
 
         res.json(results);
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -135,7 +140,7 @@ app.post('/download-repos', async (req, res) => {
         let { urls } = req.body;
 
         if (!urls) {
-            return res.status(400).json({ error: 'Missing urls in the request parameters' });
+            return res.status(400).json({ error: 'Missing <urls> in the request parameters' });
         }
         if (!Array.isArray(urls)) {
             urls = [urls];
@@ -167,8 +172,7 @@ app.post('/download-repos', async (req, res) => {
         // Pipe the zip file to the response
         archive.pipe(res);
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error.message });
     }
 });
 
