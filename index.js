@@ -70,15 +70,13 @@ async function fetchAndHashContent(url, visitedUrls = new Set()) {
     }
 
     visitedUrls.add(url);
-
     const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
     const content = response.data.toString('utf-8');
-
     // Parse HTML content to identify linked resources
     const root = parseHtml(content);
     const linkedResources = root.querySelectorAll('link[rel="stylesheet"], script[src]');
     // Fetch and hash linked resources
-    const linkedResourceHashes = await Promise.all(linkedResources.map(async (resource) => {
+    const linkedResource = await Promise.all(linkedResources.map(async (resource) => {
         const resourceUrl = parseUrl(resource.getAttribute('href') || resource.getAttribute('src'), true);
         let absoluteResourceUrl = resourceUrl.href;
         if (!resourceUrl.hostname) {
@@ -91,10 +89,10 @@ async function fetchAndHashContent(url, visitedUrls = new Set()) {
     }));
 
     // Combine the content and hashes of linked resources
-    return `${content}_${linkedResourceHashes.join('_')}`;
+    return `${content}_${linkedResource.join('_')}`;
 }
 
-
+const hashCache = new Map();
 // API endpoint to start the recursive download and hashing
 app.post('/hash', async (req, res) => {
     try {
@@ -107,17 +105,31 @@ app.post('/hash', async (req, res) => {
 
         const promises = urls.map(async (url) => {
             const urlWithoutHashAndQuery = parseUrlWithoutHashAndQuery(url);
-            const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
-            const fileHash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
-            return { url, fileHash };
+            let hash;
+            // regex to identify owner and repo name from https://owner.github.io/repo-name
+            const githubRepoRegex = /https?:\/\/([\w-]+)\.github\.io\/([\w-]+)/;
+            if (githubRepoRegex.test(urlWithoutHashAndQuery)) {
+                const [, owner, repo] = githubRepoRegex.exec(urlWithoutHashAndQuery) || [null, null, null,];
+                const { data } = await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
+                const lastUpdated = new Date(data.pushed_at);
+
+                const cached = hashCache.get(urlWithoutHashAndQuery);
+                if (cached && cached.lastUpdated >= lastUpdated) {
+                    hash = cached.hash;
+                } else {
+                    const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
+                    hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
+                    hashCache.set(urlWithoutHashAndQuery, { hash, lastUpdated });
+                }
+            } else {
+                const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
+                hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
+            }
+
+            return { url, hash };
         });
 
         let results = await Promise.all(promises);
-        results = results.reduce((acc, { url, fileHash }) => {
-            acc[url] = fileHash;
-            return acc;
-        }, {});
-
         res.json(results);
     } catch (error) {
         res.status(500).json({ error: error.message });
