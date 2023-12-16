@@ -13,5 +13,5 @@ jobs:
         password: ${{ secrets.PASSWORD }}
         port: ${{ secrets.PORT }}
         script: |
-          cd /home/production/deployed/hasher && git pull 
-          supervisorctl restart integrity-api
+          cd ${{ secrets.APP_FOLDER }} && git pull 
+          supervisorctl restart ${{ secrets.SUPERVISOR_SERVICE_NAME }} 
