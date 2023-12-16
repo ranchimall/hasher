@@ -1,20 +1,16 @@
 name: Pull changes and deploy API
-
 on: [push]
-
 jobs:
+
   build:
-
+    name: Build
     runs-on: self-hosted
-
     steps:
-    - uses: actions/checkout@v1
-
     - name: Executing remote command
-      uses: appleboy/ssh-action@master
+      uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.HOST }}
-        USERNAME: ${{ secrets.USERNAME }}
-        PORT: ${{ secrets.PORT }}
-        KEY: ${{ secrets.SSHKEY }}
-        script: ls
+        username: ${{ secrets.USERNAME }}
+        password: ${{ secrets.PASSWORD }}
+        port: ${{ secrets.PORT }}
+        script: whoami
