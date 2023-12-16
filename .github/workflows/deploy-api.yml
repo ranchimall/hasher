@@ -1,7 +1,6 @@
 name: Pull changes and deploy API
 on: [push]
 jobs:
-
   build:
     name: Build
     runs-on: self-hosted
@@ -14,5 +13,5 @@ jobs:
         password: ${{ secrets.PASSWORD }}
         port: ${{ secrets.PORT }}
         script: |
-          whoami
-          ls -al
+          cd /home/production/deployed/hasher && git pull 
+          supervisorctl restart integrity-api
