@@ -3,7 +3,6 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const { createHash } = require('crypto');
-const archiver = require('archiver');
 const rateLimit = require('express-rate-limit');
 const { parse: parseUrl, URL } = require('url');
 const { parse: parseHtml } = require('node-html-parser');
@@ -70,7 +69,7 @@ async function fetchAndHashContent(url, visitedUrls = new Set()) {
     }
 
     visitedUrls.add(url);
-    const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+    const response = await axios.get(url, { responseType: 'arraybuffer' });
     const content = response.data.toString('utf-8');
     // Parse HTML content to identify linked resources
     const root = parseHtml(content);
@@ -102,7 +101,6 @@ app.post('/hash', async (req, res) => {
         }
         if (!Array.isArray(urls))
             urls = [urls];
-
         const promises = urls.map(async (url) => {
             const urlWithoutHashAndQuery = parseUrlWithoutHashAndQuery(url);
             let hash;
@@ -131,58 +129,6 @@ app.post('/hash', async (req, res) => {
 
         let results = await Promise.all(promises);
         res.json(results);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Function to download a GitHub repo as a zip file
-async function downloadGitHubRepo(owner, repo) {
-    if (!owner || !repo) {
-        throw new Error('Missing owner or repo');
-    }
-    const zipUrl = `https://github.com/${owner}/${repo}/archive/refs/heads/master.zip`;
-    const response = await axios.get(zipUrl, { responseType: 'arraybuffer' });
-    return response.data;
-}
-
-// Endpoint to download and zip GitHub repositories
-app.post('/download-repos', async (req, res) => {
-    try {
-        let { urls } = req.body;
-
-        if (!urls) {
-            return res.status(400).json({ error: 'Missing <urls> in the request parameters' });
-        }
-        if (!Array.isArray(urls)) {
-            urls = [urls];
-        }
-
-        const archive = archiver('zip');
-        res.attachment('repos.zip');
-
-        // Create an array of promises for each repository download
-        const downloadPromises = urls.map(async (url) => {
-            const [owner, name] = url.split('/').slice(-2);
-
-            if (!owner || !name) {
-                console.error(`Invalid url format: ${url}`);
-                return;
-            }
-
-            const zipBuffer = await downloadGitHubRepo(owner, name);
-            // Add the zip file to the archiver
-            archive.append(zipBuffer, { name: `${owner}-${name}.zip` });
-        });
-
-        // Wait for all promises to complete
-        await Promise.all(downloadPromises);
-
-        // Finalize the zip file
-        archive.finalize();
-
-        // Pipe the zip file to the response
-        archive.pipe(res);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
