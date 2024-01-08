@@ -106,7 +106,7 @@ app.post('/hash', async (req, res) => {
             let hash;
             // regex to identify owner and repo name from https://owner.github.io/repo-name
             const githubRepoRegex = /https?:\/\/([\w-]+)\.github\.io\/([\w-]+)/;
-            if (githubRepoRegex.test(urlWithoutHashAndQuery)) {
+            if (githubRepoRegex.test(urlWithoutHashAndQuery) && urlWithoutHashAndQuery.match(githubRepoRegex)[1] === 'ranchimall') {
                 if (!hashCache.has(urlWithoutHashAndQuery)) {
                     await fetchAndSaveAppHash(urlWithoutHashAndQuery)
                 }
