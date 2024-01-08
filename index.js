@@ -28,7 +28,7 @@ app.use(express.json());
 app.use(
     rateLimit({
         windowMs: 1 * 60 * 1000, // 1 minute
-        max: 10, // limit each IP request per windowMs
+        max: 20, // limit each IP request per windowMs
     })
 );
 
@@ -107,32 +107,44 @@ app.post('/hash', async (req, res) => {
             // regex to identify owner and repo name from https://owner.github.io/repo-name
             const githubRepoRegex = /https?:\/\/([\w-]+)\.github\.io\/([\w-]+)/;
             if (githubRepoRegex.test(urlWithoutHashAndQuery)) {
-                const [, owner, repo] = githubRepoRegex.exec(urlWithoutHashAndQuery) || [null, null, null,];
-                const { data } = await axios.get(`https://api.github.com/repos/${owner}/${repo}`);
-                const lastUpdated = new Date(data.pushed_at);
-
-                const cached = hashCache.get(urlWithoutHashAndQuery);
-                if (cached && cached.lastUpdated >= lastUpdated) {
-                    hash = cached.hash;
-                } else {
-                    const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
-                    hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
-                    hashCache.set(urlWithoutHashAndQuery, { hash, lastUpdated });
+                if (!hashCache.has(urlWithoutHashAndQuery)) {
+                    await fetchAndSaveAppHash(urlWithoutHashAndQuery)
                 }
+                hash = hashCache.get(urlWithoutHashAndQuery).hash;
             } else {
                 const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
                 hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
             }
-
             return { url, hash };
         });
 
-        let results = await Promise.all(promises);
+        const results = await Promise.all(promises);
         res.json(results);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+async function fetchAndSaveAppHash(url, lastUpdated = Date.now()) {
+    const hashedContent = await fetchAndHashContent(url);
+    const hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
+    hashCache.set(url, { hash, lastUpdated });
+}
+
+app.post('/gitwh', async (req, res) => {
+    try {
+        // ignore if request is not from github
+        if (!req.headers['user-agent'].startsWith('GitHub-Hookshot/'))
+            return;
+        const { repository: { pushed_at, organization, name, has_pages } } = req.body;
+        if (!has_pages)
+            return;
+        const url = `https://${organization}.github.io/${name}`
+        await fetchAndSaveAppHash(url, pushed_at)
+        res.json({ message: 'success' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+})
 
 // Start the server
 app.listen(port, host, () => {
