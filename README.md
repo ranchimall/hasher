@@ -1,2 +1,2 @@
-# APIs for testing content intigrity 
+# APIs for testing content integrity 
  
