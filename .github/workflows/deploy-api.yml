@@ -14,4 +14,6 @@ jobs:
         port: ${{ secrets.PORT }}
         script: |
           cd ${{ secrets.APP_FOLDER }} && git pull 
+          ${{ secrets.NPM_VERSION_PATH }} install
+          cat ${{ secrets.ENV_FILE_CONTENT }} >> .env
           supervisorctl restart ${{ secrets.SUPERVISOR_SERVICE_NAME }} 
