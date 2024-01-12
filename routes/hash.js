@@ -61,38 +61,47 @@ async function fetchAndHashContent(url, visitedUrls = new Set()) {
 }
 
 const hashCache = new Map();
+router.get("/", async (req, res) => {
+    const { url } = req.query;
+    if (!url) {
+        return res.status(400).json({ error: 'Missing <url> in the query parameters' });
+    }
+    res.json(await generateHash(url));
+})
 // API endpoint to start the recursive download and hashing
 router.post('/', async (req, res) => {
     try {
-        let { urls } = req.body;
+        const { urls } = req.body;
         if (!urls) {
             return res.status(400).json({ error: 'Missing <urls> in the request parameters' });
         }
-        if (!Array.isArray(urls))
-            urls = [urls];
-        const promises = urls.map(async (url) => {
-            const urlWithoutHashAndQuery = parseUrlWithoutHashAndQuery(url);
-            let hash;
-            // regex to identify owner and repo name from https://owner.github.io/repo-name
-            const githubRepoRegex = /https?:\/\/([\w-]+)\.github\.io\/([\w-]+)/;
-            if (githubRepoRegex.test(urlWithoutHashAndQuery) && urlWithoutHashAndQuery.match(githubRepoRegex)[1] === 'ranchimall') {
-                if (!hashCache.has(urlWithoutHashAndQuery)) {
-                    await fetchAndSaveAppHash(urlWithoutHashAndQuery)
-                }
-                hash = hashCache.get(urlWithoutHashAndQuery).hash;
-            } else {
-                const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
-                hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
-            }
-            return { url, hash };
-        });
-
-        const results = await Promise.all(promises);
-        res.json(results);
+        res.json(await generateHash(urls));
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 });
+async function generateHash(urls = []) {
+    if (!Array.isArray(urls))
+        urls = [urls];
+    const promises = urls.map(async (url) => {
+        const urlWithoutHashAndQuery = parseUrlWithoutHashAndQuery(url);
+        let hash;
+        // regex to identify owner and repo name from https://owner.github.io/repo-name
+        const githubRepoRegex = /https?:\/\/([\w-]+)\.github\.io\/([\w-]+)/;
+        if (githubRepoRegex.test(urlWithoutHashAndQuery) && urlWithoutHashAndQuery.match(githubRepoRegex)[1] === 'ranchimall') {
+            if (!hashCache.has(urlWithoutHashAndQuery)) {
+                await fetchAndSaveAppHash(urlWithoutHashAndQuery)
+            }
+            hash = hashCache.get(urlWithoutHashAndQuery).hash;
+        } else {
+            const hashedContent = await fetchAndHashContent(urlWithoutHashAndQuery);
+            hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
+        }
+        return { url, hash };
+    });
+
+    return await Promise.all(promises);
+}
 async function fetchAndSaveAppHash(url, lastUpdated = Date.now()) {
     const hashedContent = await fetchAndHashContent(url);
     const hash = await hashContent(Buffer.from(hashedContent, 'utf-8'));
