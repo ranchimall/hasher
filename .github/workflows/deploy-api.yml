@@ -16,6 +16,7 @@ jobs:
           cd ${{ secrets.APP_FOLDER }} && git pull 
           source ~/.nvm/nvm.sh
           nvm use ${{ secrets.NVM_VERSION }}
-          ${{ secrets.NPM_VERSION_PATH }} install
+          npm install
+          touch ${{ secrets.ENV_FILE_CONTENT }}
           cat ${{ secrets.ENV_FILE_CONTENT }} >> .env
           supervisorctl restart ${{ secrets.SUPERVISOR_SERVICE_NAME }} 
