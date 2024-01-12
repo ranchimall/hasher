@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RanchiMall Utility APIs</title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        ol li {
+            margin-bottom: 5rem;
+        }
+
+        a {
+            color: inherit;
+        }
+
+        table {
+            border-collapse: collapse;
+        }
+
+        table,
+        th,
+        td {
+            border: 1px solid black;
+            padding: 0.5rem;
+        }
+
+        code {
+            display: inline-block;
+            background-color: #eee;
+            padding: 0.3rem;
+            border-radius: 0.2rem;
+            font: monospace;
+            font-size: inherit;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: #222;
+                color: #eee;
+            }
+
+            table,
+            th,
+            td {
+                border-color: #eee;
+            }
+
+            code {
+                background-color: #333;
+                color: #eee;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <section style="padding:4vw;">
+        <h1>
+            Welcome to the RanchiMall Utility APIs!
+        </h1>
+        <h2>
+            Endpoints:
+        </h2>
+        <ol>
+            <li>
+                <h3>
+                    <a href="/price-history">/price-history</a>
+                </h3>
+                <h4>
+                    Query parameters:
+                </h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Required</th>
+                            <th>Default</th>
+                            <th>format | values</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>from</td>
+                            <td>No</td>
+                            <td>None</td>
+                            <td>YYYY-MM-DD</td>
+                        </tr>
+                        <tr>
+                            <td>to</td>
+                            <td>No</td>
+                            <td>None</td>
+                            <td>YYYY-MM-DD</td>
+                        </tr>
+                        <tr>
+                            <td>on</td>
+                            <td>No</td>
+                            <td>None</td>
+                            <td>YYYY-MM-DD</td>
+                        </tr>
+                        <tr>
+                            <td>limit</td>
+                            <td>No</td>
+                            <td>100</td>
+                            <td>all | &lt;number&gt;</td>
+                        </tr>
+                        <tr>
+                            <td>asset</td>
+                            <td>No</td>
+                            <td>btc</td>
+                            <td>btc</td>
+                        </tr>
+                        <tr>
+                            <td>currency</td>
+                            <td>No</td>
+                            <td>All</td>
+                            <td>usd | inr</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <h4>
+                    Example:
+                </h4>
+                <code>
+                    /price-history?from=2020-01-01&to=2020-01-31
+                </code>
+            </li>
+            <li>
+                <h3>
+                    <a href="/hash">/hash</a>
+                </h3>
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Type</td>
+                            <td>POST</td>
+                        </tr>
+                        <tr>
+                            <td>Body</td>
+                            <td>JSON</td>
+                        </tr>
+                        <tr>
+                            <td>Body parameter</td>
+                            <td>urls [Array]</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <h4>
+                    Example:
+                </h4>
+                <code>
+                    fetch('https://utility-api.ranchimall.net/hash',{ <br>
+                        &nbsp;  method: 'POST',<br>
+                        &nbsp;  headers: {<br>
+                        &nbsp;  &nbsp; 'Content-Type': 'application/json'<br>
+                        &nbsp;  },<br>
+                        &nbsp;  body: JSON.stringify({ urls: [url] })<br>
+                    }).then(res => res.json()).then(console.log)
+                    <br>
+                    <br>
+                    Output: <br>
+                    [{<br>
+                    &nbsp;      "url": url,<br>
+                    &nbsp;      "hash": hash<br>
+                    }]
+                </code>
+            </li>
+        </ol>
+    </section>
+</body>
+
+</html>
