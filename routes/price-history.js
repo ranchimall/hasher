@@ -41,6 +41,15 @@ router.get("/", async (req, res) => {
         const searchParams = {
             asset
         }
+        if (from && to) {
+            from = new Date(from).getTime();
+            to = new Date(to).getTime();
+            if (from > to) {
+                const temp = from;
+                from = to;
+                to = temp;
+            }
+        }
         if (from) {
             searchParams.date = { $gte: new Date(from).getTime() };
         }
