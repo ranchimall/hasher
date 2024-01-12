@@ -18,5 +18,5 @@ jobs:
           nvm use ${{ secrets.NVM_VERSION }}
           npm install
           touch ${{ secrets.ENV_FILE_CONTENT }}
-          cat ${{ secrets.ENV_FILE_CONTENT }} >> .env
+          echo "${{ secrets.ENV_FILE_CONTENT }}" >> .env
           supervisorctl restart ${{ secrets.SUPERVISOR_SERVICE_NAME }} 
