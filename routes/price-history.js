@@ -37,7 +37,7 @@ loadHistoricToDb();
 router.get("/", async (req, res) => {
     console.log('price-history');
     try {
-        const { from, to, on, limit = 100, asset = 'btc', currency } = req.query;
+        let { from, to, on, limit = 100, asset = 'btc', currency, sort, dates } = req.query;
         const searchParams = {
             asset
         }
@@ -47,11 +47,24 @@ router.get("/", async (req, res) => {
         if (to) {
             searchParams.date = { ...searchParams.date, $lte: new Date(to).getTime() };
         }
+        if (dates) {
+            const datesArray = dates.split(',');
+            searchParams.date = { $in: datesArray.map(date => new Date(date).getTime()) };
+        }
         if (on) {
             searchParams.date = { $eq: new Date(on).getTime() };
         }
         if (currency) {
             searchParams[currency] = { $exists: true };
+        }
+        if (sort) {
+            if (['asc', 'desc', 'ascending', 'descending', '1', '-1'].includes(sort))
+                sort = { date: sort === 'asc' || sort === 'ascending' || sort === '1' ? 1 : -1 };
+            else
+                return res.status(400).json({ error: 'Invalid sort. Valid values are asc | desc | ascending | descending | 1 | -1' });
+
+        } else {
+            sort = { date: -1 };
         }
         const dataFormat = { _id: 0, __v: 0, asset: 0 };
         if (currency === 'inr') {
@@ -61,25 +74,8 @@ router.get("/", async (req, res) => {
             dataFormat.inr = 0;
         }
         const priceHistory = await PriceHistory.find(searchParams, dataFormat)
-            .sort({ date: -1 })
+            .sort(sort)
             .limit(limit === 'all' ? 0 : parseInt(limit));
-        res.json(priceHistory);
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-})
-
-router.post("/", async (req, res) => {
-    try {
-        const { dates } = req.body;
-        if (!dates) {
-            return res.status(400).json({ error: 'dates is required' });
-        }
-        if (!Array.isArray(dates)) {
-            return res.status(400).json({ error: 'dates must be an array' });
-        }
-        const priceHistory = await PriceHistory.find({ date: { $in: dates } }, { _id: 0, __v: 0, asset: 0 });
         res.json(priceHistory);
     } catch (err) {
         console.log(err);
