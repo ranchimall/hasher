@@ -84,7 +84,8 @@ router.get("/", async (req, res) => {
         }
         const priceHistory = await PriceHistory.find(searchParams, dataFormat)
             .sort(sort)
-            .limit(limit === 'all' ? 0 : parseInt(limit));
+            .limit(limit === 'all' ? 0 : parseInt(limit))
+            .lean();
         res.json(priceHistory);
     } catch (err) {
         console.log(err);
