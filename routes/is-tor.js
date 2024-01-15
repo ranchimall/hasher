@@ -4,7 +4,7 @@ const axios = require('axios');
 
 router.get('/', async (req, res) => {
     try {
-        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+        const ip = req.socket.remoteAddress;
         const response = await axios.get(`https://check.torproject.org/cgi-bin/TorBulkExitList.py?ip=${ip}`);
         const isTor = response.data.includes(ip);
         res.json({ isTor, ip });
