@@ -4,9 +4,10 @@ const axios = require('axios');
 
 router.get('/', async (req, res) => {
     try {
-        const response = await axios.get('https://check.torproject.org/api/ip');
-        const isTor = response.data.IsTor;
-        res.json({ isTor });
+        const ip = req.headers['x-forwarded-for'] || req.get('X-Real-IP') || req.ip;
+        const response = await axios.get(`https://check.torproject.org/cgi-bin/TorBulkExitList.py?ip=${ip}`);
+        const isTor = response.data.includes(ip);
+        res.json({ isTor, ip });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
