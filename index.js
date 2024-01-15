@@ -44,14 +44,13 @@ const hash = require('./routes/hash')
 app.use("/hash", hash);
 const priceHistory = require('./routes/price-history')
 app.use("/price-history", priceHistory);
+const isTor = require('./routes/is-tor')
+app.use("/is-tor", isTor);
 
 // Start the server
 app.listen(PORT, HOST, () => {
     console.log(`Server is running at http://${HOST}:${PORT}`);
 });
-// TODO 
-//https://utility-api.ranchimall.net/hash/gitwh
-
 
 // Export the Express API
 module.exports = app;
