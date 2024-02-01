@@ -11,6 +11,8 @@ const app = express();
 
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '127.0.0.1';
+const MONGOPORT = process.env.MONGOPORT || 27017;
+const MONGOHOST = process.env.MONGOHOST || '127.0.0.1'
 
 // Middleware to parse JSON requests
 app.use(express.json());
@@ -30,7 +32,7 @@ app.use(
 );
 
 // connect to MongoDB
-mongoose.connect(`mongodb://${HOST}/price-history`);
+mongoose.connect(`mongodb://${MONGOHOST}:${MONGOPORT}/price-history`);
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
 db.once('open', () => {
