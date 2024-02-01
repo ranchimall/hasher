@@ -9,8 +9,8 @@ jobs:
       uses: appleboy/ssh-action@v1.0.0
       with:
         host: ${{ secrets.HOST }}
-        username: ${{ secrets.USERNAME }}
-        password: ${{ secrets.PASSWORD }}
+        username: ${{ secrets.P_USERNAME }}
+        password: ${{ secrets.P_PASSWORD }}
         port: ${{ secrets.PORT }}
         script: |
           cd ${{ secrets.APP_FOLDER }} && git pull 
