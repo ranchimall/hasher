@@ -1,9 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const cron = require('node-cron');
+const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-const csv = require('csv-parser'); // Assuming you have installed the csv-parser package
+const csv = require('csv-parser');
 
 const PriceHistory = require('../models/price-history');
 
@@ -21,133 +22,77 @@ function readCsvFile() {
     });
 }
 
-// Function to load historic data into the database without deleting old data
-async function loadHistoricToDb() {
-    const now = parseInt(Date.now() / 1000);
+// Function to fetch BTC prices in USD and INR from BitPay API
+async function fetchBtcPrices() {
     try {
-        const [usd, inr] = await Promise.all([
-            fetch(`https://query1.finance.yahoo.com/v7/finance/download/BTC-USD?period1=1410912000&period2=${now}&interval=1d&events=history&includeAdjustedClose=true`).then((res) => res.text()),
-            fetch(`https://query1.finance.yahoo.com/v7/finance/download/BTC-INR?period1=1410912000&period2=${now}&interval=1d&events=history&includeAdjustedClose=true`).then((res) => res.text())
-        ]);
+        const response = await axios.get('https://bitpay.com/api/rates');
+        const rates = response.data;
 
-        // If fetch succeeds, process the fetched data
-        const usdData = usd.split("\n").slice(1);
-        const inrData = inr.split("\n").slice(1);
-        const operations = [];
+        // Extract BTC to USD and INR rates
+        const btcUsdRate = rates.find(rate => rate.code === 'USD' && rate.name === 'US Dollar').rate;
+        const btcInrRate = rates.find(rate => rate.code === 'INR' && rate.name === 'Indian Rupee').rate;
 
-        for (let i = 0; i < usdData.length; i++) {
-            const [date, open, high, low, close, adjClose, volume] = usdData[i].split(",");
-            const [date2, open2, high2, low2, close2, adjClose2, volume2] = inrData[i].split(",");
-
-            operations.push({
-                updateOne: {
-                    filter: { date: new Date(date).getTime(), asset: "btc" },
-                    update: {
-                        $set: {
-                            usd: parseFloat(parseFloat(close).toFixed(2)),
-                            inr: parseFloat(parseFloat(close2).toFixed(2)),
-                        }
-                    },
-                    upsert: true
-                }
-            });
-        }
-
-        // Perform bulk upsert operations
-        await PriceHistory.bulkWrite(operations);
-        console.log("Data upserted successfully from API.");
-    } catch (fetchError) {
-        // If fetch fails, read from the CSV file
-        console.error("Failed to fetch data. Falling back to CSV file:", fetchError);
-        try {
-            const csvData = await readCsvFile();
-            const operations = csvData.map((row) => ({
-                updateOne: {
-                    filter: { date: new Date(row.date).getTime(), asset: "btc" },
-                    update: {
-                        $set: {
-                            usd: parseFloat(row.usd),
-                            inr: parseFloat(row.inr),
-                        }
-                    },
-                    upsert: true
-                }
-            }));
-
-            // Perform bulk upsert operations
-            await PriceHistory.bulkWrite(operations);
-            console.log("Data upserted successfully from CSV.");
-        } catch (csvError) {
-            console.error("Error reading CSV file:", csvError);
-        }
+        return { usd: btcUsdRate, inr: btcInrRate };
+    } catch (error) {
+        console.error('Error fetching BTC prices from BitPay:', error);
+        return null;
     }
 }
 
-loadHistoricToDb();
+// Function to update daily average in the database
+async function updateDailyAverage(newPrice) {
+    const today = new Date().setHours(0, 0, 0, 0);
 
-// Route to handle price history requests
-router.get("/", async (req, res) => {
-    console.log('price-history');
     try {
-        let { from, to, on, limit = 100, asset = 'btc', currency, sort, dates } = req.query;
-        const searchParams = {
-            asset
-        }
-        if (from && to) {
-            from = new Date(from).getTime();
-            to = new Date(to).getTime();
-            if (from > to) {
-                const temp = from;
-                from = to;
-                to = temp;
-            }
-        }
-        if (from) {
-            searchParams.date = { $gte: new Date(from).getTime() };
-        }
-        if (to) {
-            searchParams.date = { ...searchParams.date, $lte: new Date(to).getTime() };
-        }
-        if (dates) {
-            const datesArray = dates.split(',');
-            searchParams.date = { $in: datesArray.map(date => new Date(date).getTime()) };
-        }
-        if (on) {
-            searchParams.date = { $eq: new Date(on).getTime() };
-        }
-        if (currency) {
-            searchParams[currency] = { $exists: true };
-        }
-        if (sort) {
-            if (['asc', 'desc', 'ascending', 'descending', '1', '-1'].includes(sort))
-                sort = { date: sort === 'asc' || sort === 'ascending' || sort === '1' ? 1 : -1 };
-            else
-                return res.status(400).json({ error: 'Invalid sort. Valid values are asc | desc | ascending | descending | 1 | -1' });
+        // Fetch the current record for the day
+        const existingRecord = await PriceHistory.findOne({ date: today, asset: 'btc' });
 
+        if (existingRecord) {
+            // Update the cumulative average
+            const updatedUsdAvg = ((existingRecord.usd * existingRecord.count) + newPrice.usd) / (existingRecord.count + 1);
+            const updatedInrAvg = ((existingRecord.inr * existingRecord.count) + newPrice.inr) / (existingRecord.count + 1);
+
+            await PriceHistory.updateOne(
+                { date: today, asset: 'btc' },
+                {
+                    $set: {
+                        usd: updatedUsdAvg,
+                        inr: updatedInrAvg,
+                        count: existingRecord.count + 1  // Increment the count
+                    }
+                }
+            );
         } else {
-            sort = { date: -1 };
+            // If no record exists for today, create a new one
+            await PriceHistory.create({
+                date: today,
+                asset: 'btc',
+                usd: newPrice.usd,
+                inr: newPrice.inr,
+                count: 1  // Initialize count to 1
+            });
         }
-        const dataFormat = { _id: 0, __v: 0, asset: 0 };
-        if (currency === 'inr') {
-            dataFormat.usd = 0;
-        }
-        if (currency === 'usd') {
-            dataFormat.inr = 0;
-        }
-        const priceHistory = await PriceHistory.find(searchParams, dataFormat)
-            .sort(sort)
-            .limit(limit === 'all' ? 0 : parseInt(limit))
-            .lean();
-        res.json(priceHistory);
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-})
 
-// Cron job to periodically update the price history
+        console.log('Daily average updated successfully.');
+    } catch (err) {
+        console.error('Error updating daily average:', err);
+    }
+}
+
+// Function to collect and update prices
+async function collectAndUpdatePrices() {
+    const price = await fetchBtcPrices();
+
+    if (price) {
+        // Update the cumulative average for the day
+        await updateDailyAverage(price);
+    }
+}
+
+// Cron job to collect prices every 4 hours
 cron.schedule('0 */4 * * *', async () => {
-    await loadHistoricToDb();
+    console.log('Starting price collection for daily averaging...');
+    await collectAndUpdatePrices();
 });
 
 module.exports = router;
