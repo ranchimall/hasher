@@ -17,6 +17,11 @@ const Schema = new mongoose.Schema({
     inr: {
         type: Number,
         required: true
+    },
+    count: {
+        type: Number,  // New field to track the number of updates for the day
+        default: 1
     }
 });
+
 module.exports = mongoose.model('PriceHistory', Schema);
