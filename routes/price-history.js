@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const csv = require('csv-parser');
 
+// Import the PriceHistory model from the external file
 const PriceHistory = require('../models/price-history');
 
 const CSV_FILE_PATH = '/home/production/deployed/utility-api/btc_price_history_full.csv';
@@ -41,7 +42,9 @@ async function fetchBtcPrices() {
 
 // Function to update daily average in the database
 async function updateDailyAverage(newPrice) {
-    const today = new Date().setHours(0, 0, 0, 0);
+    // Set the date to the start of the day (00:00:00.000)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     try {
         // Fetch the current record for the day
