@@ -1,39 +1,91 @@
 const express = require('express');
 const router = express.Router();
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
+const csv = require('csv-parser'); // Assuming you have installed the csv-parser package
 
 const PriceHistory = require('../models/price-history');
 
-function loadHistoricToDb() {
-    const now = parseInt(Date.now() / 1000);
-    Promise.all([
-        fetch(`https://query1.finance.yahoo.com/v7/finance/download/BTC-USD?period1=1410912000&period2=${now}&interval=1d&events=history&includeAdjustedClose=true`).then((res) => res.text()),
-        fetch(`https://query1.finance.yahoo.com/v7/finance/download/BTC-INR?period1=1410912000&period2=${now}&interval=1d&events=history&includeAdjustedClose=true`).then((res) => res.text()),
-    ])
-        .then(async ([usd, inr]) => {
-            const usdData = usd.split("\n").slice(1);
-            const inrData = inr.split("\n").slice(1);
-            const priceHistoryData = [];
-            for (let i = 0; i < usdData.length; i++) {
-                const [date, open, high, low, close, adjClose, volume] = usdData[i].split(",");
-                const [date2, open2, high2, low2, close2, adjClose2, volume2] = inrData[i].split(",");
-                priceHistoryData.push({
-                    date: new Date(date).getTime(),
-                    asset: "btc",
-                    usd: parseFloat(parseFloat(close).toFixed(2)),
-                    inr: parseFloat(parseFloat(close2).toFixed(2)),
-                });
-            }
-            // update many
-            await PriceHistory.deleteMany({ asset: 'btc' });
-            await PriceHistory.insertMany(priceHistoryData);
-        })
-        .catch((err) => {
-            console.log(err);
-        })
+const CSV_FILE_PATH = '/home/production/deployed/utility-api/btc_price_history_full.csv';
+
+// Function to read CSV file and return data
+function readCsvFile() {
+    return new Promise((resolve, reject) => {
+        const results = [];
+        fs.createReadStream(CSV_FILE_PATH)
+            .pipe(csv())
+            .on('data', (data) => results.push(data))
+            .on('end', () => resolve(results))
+            .on('error', (err) => reject(err));
+    });
 }
+
+// Function to load historic data into the database without deleting old data
+async function loadHistoricToDb() {
+    const now = parseInt(Date.now() / 1000);
+    try {
+        const [usd, inr] = await Promise.all([
+            fetch(`https://query1.finance.yahoo.com/v7/finance/download/BTC-USD?period1=1410912000&period2=${now}&interval=1d&events=history&includeAdjustedClose=true`).then((res) => res.text()),
+            fetch(`https://query1.finance.yahoo.com/v7/finance/download/BTC-INR?period1=1410912000&period2=${now}&interval=1d&events=history&includeAdjustedClose=true`).then((res) => res.text())
+        ]);
+
+        // If fetch succeeds, process the fetched data
+        const usdData = usd.split("\n").slice(1);
+        const inrData = inr.split("\n").slice(1);
+        const operations = [];
+
+        for (let i = 0; i < usdData.length; i++) {
+            const [date, open, high, low, close, adjClose, volume] = usdData[i].split(",");
+            const [date2, open2, high2, low2, close2, adjClose2, volume2] = inrData[i].split(",");
+
+            operations.push({
+                updateOne: {
+                    filter: { date: new Date(date).getTime(), asset: "btc" },
+                    update: {
+                        $set: {
+                            usd: parseFloat(parseFloat(close).toFixed(2)),
+                            inr: parseFloat(parseFloat(close2).toFixed(2)),
+                        }
+                    },
+                    upsert: true
+                }
+            });
+        }
+
+        // Perform bulk upsert operations
+        await PriceHistory.bulkWrite(operations);
+        console.log("Data upserted successfully from API.");
+    } catch (fetchError) {
+        // If fetch fails, read from the CSV file
+        console.error("Failed to fetch data. Falling back to CSV file:", fetchError);
+        try {
+            const csvData = await readCsvFile();
+            const operations = csvData.map((row) => ({
+                updateOne: {
+                    filter: { date: new Date(row.date).getTime(), asset: "btc" },
+                    update: {
+                        $set: {
+                            usd: parseFloat(row.usd),
+                            inr: parseFloat(row.inr),
+                        }
+                    },
+                    upsert: true
+                }
+            }));
+
+            // Perform bulk upsert operations
+            await PriceHistory.bulkWrite(operations);
+            console.log("Data upserted successfully from CSV.");
+        } catch (csvError) {
+            console.error("Error reading CSV file:", csvError);
+        }
+    }
+}
+
 loadHistoricToDb();
 
+// Route to handle price history requests
 router.get("/", async (req, res) => {
     console.log('price-history');
     try {
@@ -93,36 +145,9 @@ router.get("/", async (req, res) => {
     }
 })
 
+// Cron job to periodically update the price history
 cron.schedule('0 */4 * * *', async () => {
-    try {
-        // will return a csv file
-        const [usd, inr] = await Promise.all([
-            fetch("https://query1.finance.yahoo.com/v7/finance/download/BTC-USD").
-                then((res) => res.text()),
-            fetch("https://query1.finance.yahoo.com/v7/finance/download/BTC-INR").
-                then((res) => res.text())
-        ]);
-
-        const usdData = usd.split("\n").slice(1);
-        const inrData = inr.split("\n").slice(1);
-        for (let i = 0; i < usdData.length; i++) {
-            const [date, open, high, low, close, adjClose, volume] = usdData[i].split(",");
-            const [date2, open2, high2, low2, close2, adjClose2, volume2] = inrData[i].split(",");
-            const priceHistoryData = {
-                date: new Date(date).getTime(),
-                asset: "btc",
-                usd: parseFloat(parseFloat(close).toFixed(2)),
-                inr: parseFloat(parseFloat(close2).toFixed(2)),
-            };
-            await PriceHistory.findOneAndUpdate(
-                { date: priceHistoryData.date, asset: priceHistoryData.asset },
-                priceHistoryData,
-                { upsert: true }
-            );
-        }
-    } catch (err) {
-        console.log(err);
-    }
-})
+    await loadHistoricToDb();
+});
 
 module.exports = router;
