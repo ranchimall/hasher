@@ -9,19 +9,15 @@ const csv = require('csv-parser');
 // Import the PriceHistory model from the external file
 const PriceHistory = require('../models/price-history');
 
-const CSV_FILE_PATH = '/home/production/deployed/utility-api/btc_price_history_full.csv';
-
-// Function to read CSV file and return data
-function readCsvFile() {
-    return new Promise((resolve, reject) => {
-        const results = [];
-        fs.createReadStream(CSV_FILE_PATH)
-            .pipe(csv())
-            .on('data', (data) => results.push(data))
-            .on('end', () => resolve(results))
-            .on('error', (err) => reject(err));
-    });
+function logWithTimestamp(message) {
+    console.log(`[${new Date().toISOString()}] ${message}`);
 }
+
+// Function to log errors with the current timestamp
+function errorWithTimestamp(message, error) {
+    console.error(`[${new Date().toISOString()}] ERROR: ${message}`, error);
+}
+
 
 // Function to parse dates in different formats (e.g., 2024-10-2 or 2024-9-3)
 function parseDateString(dateStr) {
@@ -45,7 +41,7 @@ async function fetchBtcPrices() {
 
         return { usd: btcUsdRate, inr: btcInrRate };
     } catch (error) {
-        console.error('Error fetching BTC prices from BitPay:', error);
+        errorWithTimestamp('Error fetching BTC prices from BitPay:', error);
         return null;
     }
 }
@@ -86,9 +82,9 @@ async function updateDailyAverage(newPrice) {
             });
         }
 
-        console.log('Daily average updated successfully.');
+        logWithTimestamp('Daily average updated successfully.');
     } catch (err) {
-        console.error('Error updating daily average:', err);
+        errorWithTimestamp('Error updating daily average:', err);
     }
 }
 
@@ -104,7 +100,6 @@ async function collectAndUpdatePrices() {
 
 // Route to handle price history requests
 router.get("/", async (req, res) => {
-    console.log('price-history');
     try {
         let { from, to, on, limit = 100, asset = 'btc', currency, sort, dates } = req.query;
         const searchParams = {
@@ -175,14 +170,14 @@ router.get("/", async (req, res) => {
 
         res.json(priceHistory);
     } catch (err) {
-        console.log(err);
+        errorWithTimestamp('Error serving data',err);
         res.status(500).json({ error: err });
     }
 });
 
 // Cron job to collect prices every 4 hours
 cron.schedule('0 */4 * * *', async () => {
-    console.log('Starting price collection for daily averaging...');
+    logWithTimestamp('Starting price collection for daily averaging...');
     await collectAndUpdatePrices();
 });
 
